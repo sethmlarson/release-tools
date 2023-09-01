@@ -262,17 +262,18 @@ def tarball(source):
     print('  %s  %8s  %s' % (
         checksum_xz.hexdigest(), int(os.path.getsize(xz)), xz))
 
-    print('Signing tarballs with GPG')
-    uid = os.environ.get("GPG_KEY_FOR_RELEASE")
-    if not uid:
-        print('List of available private keys:')
-        run_cmd(['gpg -K | grep -A 1 "^sec"'])
-        uid = input('Please enter key ID to use for signing: ')
-    os.system('gpg -bas -u ' + uid + ' ' + tgz)
-    os.system('gpg -bas -u ' + uid + ' ' + xz)
-
-    print('Signing tarballs with Sigstore')
-    run_cmd(['python3', '-m', 'sigstore', 'sign', '--oidc-disable-ambient-providers', tgz, xz])
+    # TODO: Add GPG and Sigstore signing at the end of the process.
+    # print('Signing tarballs with GPG')
+    # uid = os.environ.get("GPG_KEY_FOR_RELEASE")
+    # if not uid:
+    #     print('List of available private keys:')
+    #     run_cmd(['gpg -K | grep -A 1 "^sec"'])
+    #     uid = input('Please enter key ID to use for signing: ')
+    # os.system('gpg -bas -u ' + uid + ' ' + tgz)
+    # os.system('gpg -bas -u ' + uid + ' ' + xz)
+    #
+    # print('Signing tarballs with Sigstore')
+    # run_cmd(['python3', '-m', 'sigstore', 'sign', '--oidc-disable-ambient-providers', tgz, xz])
 
 
 def export(tag, silent=False):
