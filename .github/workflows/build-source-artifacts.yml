@@ -1,12 +1,20 @@
 on:
   workflow_dispatch:
     inputs:
-      cpython_branch:
-        description: "Branch to checkout for python/cpython GitHub repository (ie '3.11' or 'main')"
+      git_remote:
+        type: choice
+        description: "Git remote to checkout"
+        options:
+          - python
+          - Yhg1s
+          - pablogsal
+          - ambv
+      git_commit:
         type: string
+        description: "Git commit to target for the release. Must use the full commit SHA, not the short ID"
       cpython_release:
-        description: "Prospective release number for CPython (ie '3.11.5' or '3.12.0rc2' without the 'v' prefix)"
         type: string
+        description: "CPython release number (ie '3.11.5', note without the 'v' prefix)"
 
 name: "Build Python source artifacts"
 
@@ -19,12 +27,19 @@ jobs:
       - name: "Checkout python/release-tools"
         uses: actions/checkout@v3
 
-      - name: "Checkout python/cpython"
+      - name: "Checkout ${{ inputs.git_remote }}/cpython"
         uses: actions/checkout@v3
         with:
-          repository: "python/cpython"
-          ref: "${{ inputs.cpython_branch }}"
+          repository: "${{ inputs.git_remote }}/cpython"
+          ref: "v${{ inputs.cpython_release }}"
           path: "cpython"
+
+      - name: "Verify CPython commit matches tag"
+        run: |
+          if [[ "${{ inputs.git_commit }}" != "$(cd cpython && git rev-parse HEAD)" ]]; then
+            echo "expected git commit ('${{ inputs.git_commit }}') didn't match tagged commit ('$(git rev-parse HEAD)')"
+            exit 1
+          fi
 
       - name: "Setup Python"
         uses: actions/setup-python@v4
@@ -33,37 +48,15 @@ jobs:
 
       - name: "Install dependencies"
         run: |
+          python -m pip install --only-binary=:all: --no-deps \
+            -r requirements.txt \
+            -r cpython/Doc/requirements.txt
+
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             latexmk texlive-xetex xindy texinfo texlive-latex-base \
             texlive-fonts-recommended texlive-fonts-extra \
             texlive-full
-
-          python -m pip install --only-binary=:all: --no-deps -r requirements.txt
-          python -m pip install -r cpython/Doc/requirements.txt
-
-      - name: "Prepare for release"
-        run: |
-          # Configure github-actions[bot] identity in Git.
-          # The data for the commit isn't used anywhere by the build.
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          cd cpython
-          python -m blurb release ${{ inputs.cpython_release }}
-          git commit -m "Python ${{ inputs.cpython_release }}"
-
-          EDITOR=cat python ../release.py --bump ${{ inputs.cpython_release }}
-          git commit -a --amend --no-edit
-
-          cd Doc
-          make pydoc-topics
-          cp build/pydoc-topics/topics.py ../Lib/pydoc_data/topics.py
-          cd ..
-          git commit -a --amend --no-edit
-
-          git tag -a v${{ inputs.cpython_release }} -m "Python ${{ inputs.cpython_release }}"
-          git diff HEAD~1 HEAD > ${{ inputs.cpython_release }}.patch
 
       - name: "Build Python source tarballs"
         run: |
@@ -73,19 +66,13 @@ jobs:
       - name: "Generate hashes"
         id: hashes
         run: |
-          # Move the .patch file so that it's in the same directory
-          # as the rest of the built artifacts.
-          mv cpython/${{ inputs.cpython_release }}.patch \
-             cpython/${{ inputs.cpython_release }}/${{ inputs.cpython_release }}.patch
-
-          cd cpython/${{ inputs.cpython_release }} && echo "hashes=$(sha256sum ${{ inputs.cpython_release }}.patch docs/* src/* | base64 -w0)" >> $GITHUB_OUTPUT
+          cd cpython/${{ inputs.cpython_release }} && echo "hashes=$(sha256sum docs/* src/* | base64 -w0)" >> $GITHUB_OUTPUT
 
       - name: "Upload the artifacts"
         uses: actions/upload-artifact@v3
         with:
           name: artifacts
           path: |
-            cpython/${{ inputs.cpython_release }}/${{ inputs.cpython_release }}.patch
             cpython/${{ inputs.cpython_release }}/src
             cpython/${{ inputs.cpython_release }}/docs
 
