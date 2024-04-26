@@ -55,19 +55,6 @@ jobs:
           python -m pip install --no-deps \
             -r requirements.txt
 
-      - name: "Install docs dependencies"
-        # Docs aren't built for alpha or beta releases.
-        if: ${{ !(contains(inputs.cpython_release, 'a') || contains(inputs.cpython_release, 'b')) }}
-        run: |
-          python -m pip install \
-            -r cpython/Doc/requirements.txt
-
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
-            latexmk texlive-xetex xindy texinfo texlive-latex-base \
-            texlive-fonts-recommended texlive-fonts-extra \
-            texlive-full
-
       - name: "Build Python release artifacts"
         run: |
           cd cpython
@@ -95,16 +82,21 @@ jobs:
     needs:
       - build-source-and-docs
     permissions:
-      id-token: write
-      attestations: write
-      packages: write
-      contents: write
-
+      id-token: write # for `generate build provenance`
+      contents: write # for `generate build provenance`
+      packages: write # for `generate build provenance`
+      actions: read # for `brew pr-pull`
+      pull-requests: write # for `gh pr edit|review`
+      repository-projects: write # for `gh pr edit`
     steps:
       - name: "Download the source artifacts"
         uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427 # v4.1.4
         with:
           name: source
+
+      - name: "ls"
+        run: |
+          ls -Al
 
       - name: "Generate build provenance"
         uses: github-early-access/generate-build-provenance@main
