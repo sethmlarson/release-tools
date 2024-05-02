@@ -46,6 +46,10 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - verify-input
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
     steps:
       - name: "Checkout python/release-tools"
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -71,6 +75,12 @@ jobs:
         run: |
           cd cpython
           python ../release.py --export ${{ inputs.cpython_release }} --skip-docs
+
+      - name: "Attest build provenance"
+        uses: actions/attest-build-provenance@897ed5eab6ed058a474202017ada7f40bfa52940 # v1.0.0
+        with:
+          subject-path: |
+            cpython/${{ inputs.cpython_release }}/src/*
 
       - name: "Upload the source artifacts"
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
